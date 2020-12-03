@@ -1,6 +1,9 @@
 import React from 'react';
 import './index.scss';
 
+const boardSize = 100
+const winsize = 5
+
 const Square = (props) => {
   return (
     <button className="square" onClick={props.onClick}>
@@ -14,60 +17,70 @@ class Board extends React.Component {
     super(props);
 
     this.state = {
-      history: [{
-        squares: Array(9).fill(null),
-      }],
-      xIsNext: true,
+      squares: Array(boardSize).fill(null),
+      history: [],
+      xIsNext: true
     };
   }
 
   handleClick = (i) => {
-    const history = this.state.history;
-    const idx = this.state.history.length - 1;
-    const newSquares = history[idx].squares.slice();
-    if (newSquares[i])
-      return
+    if (calculateWinner(this.state.squares) || (this.state.squares[i] !== null)) {
+      return;
+    }
+
+    const newHistory = this.state.history.slice();
+    const newSquares = this.state.squares.slice();
+    newHistory.push(i);
 
     newSquares[i] = this.state.xIsNext ? 'X' : 'O';
     this.setState({
-      history: history.concat([{ squares: newSquares, }]),
+      history: newHistory,
+      squares: newSquares,
       xIsNext: !this.state.xIsNext,
     });
   }
 
   undoMove = () => {
-    if (this.state.history.length === 1)
-      return;
+    if (this.state.history.length === 0) {
+      return
+    }
 
-    const history = this.state.history;
-    history.pop()
+    const history = this.state.history
+    const pos = history.pop()
+    const newSquares = this.state.squares.slice()
+    newSquares[pos] = null
 
     this.setState({
       history: history,
       xIsNext: !this.state.xIsNext,
+      squares: newSquares,
     });
   }
 
   resetBoard = () => {
     this.setState({
-      history: [{
-        squares: Array(9).fill(null),
-      }],
+      squares: Array(9).fill(null),
+      history: [],
       xIsNext: true,
     });
   }
 
   renderSquare = (i) => {
-    const idx = this.state.history.length - 1;
     return <Square
-      value={this.state.history[idx].squares[i]}
+      value={this.state.squares[i]}
       onClick={() => this.handleClick(i)}
     />;
   }
 
   render() {
-    const idx = this.state.history.length - 1;
-    const winner = calculateWinner(this.state.history[idx].squares);
+    let winner
+    const history = this.state.history
+    if (history.length >= 9) {
+      winner = calculateWinner(this.state.squares, history[history.length - 1]);
+    } else {
+      winner = undefined
+    }
+
     let status;
     if (winner) {
       status = 'Winner: ' + winner;
@@ -75,24 +88,23 @@ class Board extends React.Component {
       status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
     }
 
+    const renderRow = (i) => {
+      const row = []
+      for (let j = 0; j < boardSize; j++) {
+        row.push(this.renderSquare(i * boardSize + j))
+      }
+      return row
+    }
+
+    let boards = []
+    for (let i = 0; i < boardSize; i++) {
+      boards.push(<div className="board-row">{renderRow(i)}</div>)
+    }
+
     return (
       <div>
         <div className="status">{status}</div>
-        <div className="board-row">
-          {this.renderSquare(0)}
-          {this.renderSquare(1)}
-          {this.renderSquare(2)}
-        </div>
-        <div className="board-row">
-          {this.renderSquare(3)}
-          {this.renderSquare(4)}
-          {this.renderSquare(5)}
-        </div>
-        <div className="board-row">
-          {this.renderSquare(6)}
-          {this.renderSquare(7)}
-          {this.renderSquare(8)}
-        </div>
+        {boards}
         <div>
           <button onClick={() => this.undoMove()}>undo</button>
           <button onClick={() => this.resetBoard()}>reset</button>
@@ -117,25 +129,58 @@ class App extends React.Component {
     );
   }
 }
+export default App;
 
-function calculateWinner(squares) {
-  const lines = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6],
-  ];
-  for (let i = 0; i < lines.length; i++) {
-    const [a, b, c] = lines[i];
-    if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-      return squares[a];
+function calculateWinner(squares, position) {
+  const arrLen = winsize * 2 + 1
+  const maxNum = boardSize * 2 - 1
+  let result
+
+  const arr = Array(arrLen).fill(null)
+
+  for (let j = -(winsize - 1); j < winsize; j++) {
+    for (let i = 0; i < arrLen - 1; i++) {
+      let newpos = position + j
+      if (newpos > 0 && newpos < maxNum && (Math.floor(newpos / winsize) === (Math.floor(position / winsize)))) {
+        arr[i] = squares[newpos]
+      } else {
+        arr[i] = null
+      }
     }
   }
-  return null;
+
+  console.log(arr)
+  result = largestSubString(arr)
+  if (result !== null)
+    return result
+  return null
 }
 
-export default App;
+function largestSubString(arr) {
+  let char = null
+  let tmpchar = null
+  let maxlen = 0
+  let tmplen = 0
+
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === tmpchar) {
+      tmplen = tmplen + 1
+    } else {
+      if (tmplen > maxlen) {
+        char = tmpchar
+        maxlen = tmplen
+      }
+
+      tmpchar = arr[i]
+      tmplen = 1
+    }
+  }
+
+  if (maxlen === winsize) {
+    return char
+  }
+
+  return null
+}
+
+
